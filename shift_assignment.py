@@ -144,10 +144,6 @@ for worker, shift in x:
     if value(x[worker, shift]) > 0.5:
         schedule[shift].append(worker)
 
-# Print the schedule in JSON format
-print(json.dumps(schedule, indent=2))
-
-
 # Create a dictionary to store the preference scores
 preference_count = {i: 0 for i in range(6)}
 
