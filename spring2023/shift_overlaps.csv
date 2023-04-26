@@ -1,0 +1,12 @@
+Enter shifts that overlap in the same row,
+Monday [Kitchen Clean [6:30PM-8:30PM]],Monday [Dining Hall Clean [7:00PM-8:00PM]]
+Tuesday [Kitchen Clean [6:30PM-8:30PM]],Tuesday [Dining Hall Clean [7:00PM-8:00PM]]
+Wednesday [Kitchen Clean [6:30PM-8:30PM]],Wednesday [Dining Hall Clean [7:00PM-8:00PM]]
+Thursday [Kitchen Clean [6:30PM-8:30PM]],Thursday [Dining Hall Clean [7:00PM-8:00PM]]
+Friday [Kitchen Clean [6:30PM-8:30PM]],Friday [Dining Hall Clean [7:00PM-8:00PM]]
+Sunday [Kitchen Clean [6:30PM-8:30PM]],Sunday [Dining Hall Clean [7:00PM-8:00PM]]
+Monday [Lunch Clean [1:00PM-3:00PM]],Monday [Dinner Cook I [2:00PM-4:00PM]]
+Tuesday [Lunch Clean [1:00PM-3:00PM]],Tuesday [Dinner Cook I [2:00PM-4:00PM]]
+Wednesday [Lunch Clean [1:00PM-3:00PM]],Wednesday [Dinner Cook I [2:00PM-4:00PM]]
+Thursday [Lunch Clean [1:00PM-3:00PM]],Thursday [Dinner Cook I [2:00PM-4:00PM]]
+Friday [Lunch Clean [1:00PM-3:00PM]],Friday [Dinner Cook I [2:00PM-4:00PM]]

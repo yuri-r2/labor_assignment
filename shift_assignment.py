@@ -1,11 +1,12 @@
 import pandas as pd
+from pulp import *
 
 # Define the preference scheme
 preference_scheme = {
     "Prefer": 5,
     "Neutral": 4,
     "Dislike": 3,
-    "Minor Conflict": 2,
+    "Minor Conflict": 1,
     "Major Conflict": 0
 }
 
@@ -13,65 +14,59 @@ preference_scheme = {
 ############### Populate shift_hours, shift_workers_required from shift_requirements.csv ###############
 ########################################################################################################
 
-# Initialize shift_hours and shift_workers_required as empty dictionaries
-shift_hours = {}
-shift_workers_required = {}
+def read_shift_requirements(file_path):
+    df = pd.read_csv(file_path)
+    shifts = df.columns[1:]
+
+    shift_hours = {}
+    shift_workers_required = {}
+
+    for shift in shifts:
+        shift_workers_required[shift] = int(df.loc[df['Shift Name'] == 'Required number of people', shift])
+        shift_hours[shift] = int(df.loc[df['Shift Name'] == 'Shift Length', shift])
+
+    return shift_hours, shift_workers_required
+
+def read_form_responses(file_path, shift_hours):
+    df = pd.read_csv(file_path)
+
+    worker_required_hours = {}
+    worker_preferences = {}
+
+    for index, row in df.iterrows():
+        worker_name = row['What is your first and last name?']
+        worker_required_hours[worker_name] = row['Required hours of labor']
+        worker_preferences[worker_name] = {
+            shift: preference_scheme[row[shift]] if not pd.isna(row[shift]) else 0
+            for shift in shift_hours
+        }
+
+    return worker_required_hours, worker_preferences
+
+
+def read_shift_overlaps(file_path):
+    df = pd.read_csv(file_path, header=None, skiprows=1)
+    shift_overlaps = []
+    for row in df.values:
+        shift_overlaps.append([val for val in row if pd.notna(val)])
+
+    return shift_overlaps
+
 
 # Read shift requirements CSV file
-df = pd.read_csv('spring2023/shift_requirements.csv')
-
-# Get the column names of the shifts
-shifts = df.columns[1:]
-
-# Iterate through the shifts
-for shift in shifts:
-    # Get the required number of people and shift length for the shift
-    shift_workers_required[shift] = int(df.loc[df['Shift Name'] == 'Required number of people', shift])
-    shift_hours[shift] = int(df.loc[df['Shift Name'] == 'Shift Length', shift])
-
-# Print shift_hours and shift_workers_required
-# print("Shift hours:", shift_hours)
-# print("Shift workers required:", shift_workers_required)
-
-########################################################################################################
-############# Populate worker_required_hours, worker_preferences from form_responses.csv ###############
-########################################################################################################
-
-# Initialize worker_required_hours and worker_preferences as empty dictionaries
-worker_required_hours = {}
-worker_preferences = {}
+shift_hours, shift_workers_required = read_shift_requirements('spring2023/shift_requirements.csv')
 
 # Read form responses CSV file
-df = pd.read_csv('spring2023/form_responses.csv')
+worker_required_hours, worker_preferences = read_form_responses('spring2023/form_responses.csv', shift_hours)
 
-# Iterate through rows in the dataframe
-for index, row in df.iterrows():
-    # Get worker's name, required hours, and preferences
-    worker_name = row['Worker Name']
-    worker_required_hours[worker_name] = row['Required Hours']
-    worker_preferences[worker_name] = {shift: preference_scheme[row[shift]] for shift in shift_hours}
+# Read shift overlaps CSV file
+shift_overlaps = read_shift_overlaps("spring2023/shift_overlaps.csv")
 
-# Print worker_required_hours and worker_preferences
-# print("Worker required hours:", worker_required_hours)
-# print("Worker preferences:", worker_preferences)
-
-########################################################################################################
-################# Populate shift_overlaps from shift_overlaps.csv ######################################
-########################################################################################################
-
-df = pd.read_csv("spring2023/shift_overlaps.csv", header=None, skiprows=1)
-shift_overlaps = []
-for row in df.values:
-    shift_overlaps.append([val for val in row if pd.notna(val)])
-
-# Print the shift overlaps
-print("Shift overlaps:", shift_overlaps)
 
 #############
 # PULP CODE #
 #############
 
-from pulp import *
 
 # Create a new LP problem
 prob = LpProblem("Shift Scheduling Problem", LpMaximize)
@@ -134,8 +129,6 @@ prob.solve()
 # output code #
 ###############
 
-import json
-
 # Create a dictionary to store the schedule
 schedule = {shift: [] for shift in shift_hours.keys()}
 
@@ -143,6 +136,10 @@ schedule = {shift: [] for shift in shift_hours.keys()}
 for worker, shift in x:
     if value(x[worker, shift]) > 0.5:
         schedule[shift].append(worker)
+
+# Print the schedule in JSON format
+# print(json.dumps(schedule, indent=2))
+
 
 # Create a dictionary to store the preference scores
 preference_count = {i: 0 for i in range(6)}
@@ -152,11 +149,6 @@ for worker in worker_preferences.keys():
     for shift in shift_hours.keys():
         if value(x[worker, shift]) > 0.5:
             preference_count[worker_preferences[worker][shift]] += 1
-
-# Print the preference score statistics
-print("Preference Scores:")
-for i in range(6):
-    print(f"{i}: {preference_count[i]}")
 
 # Create a dictionary to store the required and assigned hours for each worker
 worker_hours = {worker: {"required": worker_required_hours[worker], "assigned": value(h[worker])} for worker in worker_required_hours.keys()}
@@ -171,21 +163,16 @@ for worker in worker_hours.keys():
         worker_hours[worker]["preference_score"] = 0
 
 # print the schedule
+print("SCHEDULE:\n")
 for shift, workers in schedule.items():
-    print(shift + ":")
+    print("    " + shift)
     for worker in workers:
         print(worker)
-    print()
 
-# Print total hours required from all shifts
-total_hours_required = sum(shift_hours[shift] * shift_workers_required[shift] for shift in shift_hours.keys())
-print("Total hours required from all shifts: ", total_hours_required)
+print("END OF SCHEDULE\n")
 
-# Print total hours available from all workers
-total_hours_available = sum(worker_required_hours.values())
-print("Total hours available from all workers: ", total_hours_available)
 
-print("{:<20} {:<10} {:<5} {:<5}".format("Name", "Required Hours", "Assigned Hours", "Score"))
+print("{:<20} {:<5} {:<5} {:<5}".format("Name", "|Required Hours|", "Assigned Hours|", "Score"))
 total_preference_score = 0
 total_hours_assigned = 0
 for worker in worker_hours:
@@ -195,12 +182,24 @@ for worker in worker_hours:
     total_preference_score += preference_score
     total_hours_assigned += assigned_hours
     if assigned_hours == required_hours:
-        print("\033[92m{:<30} {:<5} {:<5} {:<5}\033[0m".format(worker, required_hours, assigned_hours, preference_score))
+        print("\033[92m{:<30} {:<10} {:<10} {:<10}\033[0m".format(worker, required_hours, assigned_hours, preference_score))
     else:
-        print("\033[91m{:<30} {:<5} {:<5} {:<5}\033[0m".format(worker, required_hours, assigned_hours, preference_score))
+        print("\033[91m{:<30} {:<10} {:<10} {:<10}\033[0m".format(worker, required_hours, assigned_hours, preference_score))
 
-print("TOTAL PREFERENCE SCORE: ", total_preference_score / len(worker_hours))
+
+# Print total hours required from all shifts
+total_hours_required = sum(shift_hours[shift] * shift_workers_required[shift] for shift in shift_hours.keys())
+print("Total hours required from all shifts: ", total_hours_required)
+
+# Print total hours available from all workers
+total_hours_available = sum(worker_required_hours.values())
+print("Total hours available from all workers: ", total_hours_available)
+
 print("TOTAL ASSIGNED HOURS: ", total_hours_assigned)
 
+print("TOTAL PREFERENCE SCORE: ", total_preference_score / len(worker_hours))
 
-
+# Print the preference score statistics
+print("Preference Score Count:")
+for i in range(6):
+    print(f"{i}: {preference_count[i]}")
